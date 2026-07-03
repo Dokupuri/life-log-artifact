@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#2A4B7C"/>
+  <g>
+    <rect x="150" y="104" width="212" height="304" rx="34" fill="#F7F3EA" stroke="#0d1017" stroke-opacity="0.15" stroke-width="4"/>
+    <rect x="150" y="360" width="212" height="48" rx="34" fill="#000" fill-opacity="0.06"/>
+    <text x="256" y="300" font-family="'Hiragino Sans','Noto Sans JP',sans-serif" font-size="196" font-weight="800" fill="#C1272D" text-anchor="middle">中</text>
+  </g>
+</svg>

@@ -1,0 +1,656 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>麻雀 精算</title>
+<meta name="description" content="素点を入れるだけで、ウマ・オカ・ビンタ・チップ・ソシー・焼き鳥まで自動計算。ルール違いの複数ゲームを1日分まとめて集計する麻雀スコア精算アプリ">
+<meta name="theme-color" content="#2A4B7C">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="麻雀精算">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon.svg">
+<style>
+:root{
+  --accent:#2A4B7C; --accent-ink:#fff;
+  --good:#1E8A5F; --good-bg:rgba(30,138,95,.12);
+  --bad:#C1272D;  --bad-bg:rgba(193,39,45,.12);
+  --warn:#B67207;
+  --bg:#EFE9DC; --panel:#F7F3EA; --card:#FFFFFF; --sunk:#EAE3D3;
+  --ink:#20242C; --ink-2:#5c6270; --ink-3:#8b8f9a;
+  --line:#ddd3bf; --line-2:#e7ded0;
+  --shadow:0 1px 2px rgba(40,35,20,.06),0 6px 18px rgba(40,35,20,.06);
+  --r:14px; --r-sm:10px;
+  --jp:"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP",Meiryo,system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root{
+  --accent:#6f9be0; --accent-ink:#0d1017;
+  --good:#4fd39a; --good-bg:rgba(79,211,154,.14); --bad:#ff6b6f; --bad-bg:rgba(255,107,111,.14); --warn:#e6a94b;
+  --bg:#0f131b; --panel:#161b25; --card:#1c222e; --sunk:#12161f;
+  --ink:#eef1f6; --ink-2:#a3abbb; --ink-3:#727a8a; --line:#2a3140; --line-2:#232a37;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.35);
+}}
+:root[data-theme="light"]{
+  --accent:#2A4B7C; --accent-ink:#fff; --good:#1E8A5F; --good-bg:rgba(30,138,95,.12); --bad:#C1272D; --bad-bg:rgba(193,39,45,.12); --warn:#B67207;
+  --bg:#EFE9DC; --panel:#F7F3EA; --card:#FFFFFF; --sunk:#EAE3D3; --ink:#20242C; --ink-2:#5c6270; --ink-3:#8b8f9a; --line:#ddd3bf; --line-2:#e7ded0;
+  --shadow:0 1px 2px rgba(40,35,20,.06),0 6px 18px rgba(40,35,20,.06);
+}
+:root[data-theme="dark"]{
+  --accent:#6f9be0; --accent-ink:#0d1017; --good:#4fd39a; --good-bg:rgba(79,211,154,.14); --bad:#ff6b6f; --bad-bg:rgba(255,107,111,.14); --warn:#e6a94b;
+  --bg:#0f131b; --panel:#161b25; --card:#1c222e; --sunk:#12161f; --ink:#eef1f6; --ink-2:#a3abbb; --ink-3:#727a8a; --line:#2a3140; --line-2:#232a37;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:var(--jp);background:var(--bg);color:var(--ink);-webkit-text-size-adjust:100%;line-height:1.5;font-variant-numeric:tabular-nums;padding-bottom:calc(72px + env(safe-area-inset-bottom))}
+.num{font-variant-numeric:tabular-nums}
+h1,h2,h3{margin:0;text-wrap:balance}
+header{position:sticky;top:0;z-index:20;background:var(--accent);color:var(--accent-ink);padding:calc(env(safe-area-inset-top) + 12px) 16px 12px;display:flex;align-items:center;gap:12px;box-shadow:0 2px 10px rgba(0,0,0,.15)}
+.brand{display:flex;align-items:center;gap:10px;flex:1;min-width:0}
+.tile{width:30px;height:38px;border-radius:6px;flex:none;background:linear-gradient(#fff,#f0ece0);border:1px solid rgba(0,0,0,.15);display:grid;place-items:center;color:#C1272D;font-weight:800;font-size:20px;box-shadow:inset 0 -3px 0 rgba(0,0,0,.08)}
+.brand h1{font-size:18px;font-weight:800;letter-spacing:.08em}
+.brand small{display:block;font-size:11px;opacity:.85;letter-spacing:.04em;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:60vw}
+.iconbtn{appearance:none;border:0;background:rgba(255,255,255,.16);color:inherit;width:38px;height:38px;border-radius:10px;font-size:18px;cursor:pointer;flex:none}
+.iconbtn:active{transform:scale(.94)}
+.gamebar{background:var(--panel);border-bottom:1px solid var(--line);padding:8px 10px;display:flex;gap:8px;overflow-x:auto;align-items:center;position:sticky;top:0;z-index:10}
+.gamebar::-webkit-scrollbar{display:none}
+.gchip{flex:none;border:1px solid var(--line);background:var(--card);color:var(--ink-2);border-radius:999px;padding:7px 14px;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap}
+.gchip.on{background:var(--accent);color:var(--accent-ink);border-color:transparent}
+.gchip.add{color:var(--accent);font-weight:800;border-style:dashed}
+main{max-width:640px;margin:0 auto;padding:14px 14px 24px}
+.panel{display:none}
+.panel.active{display:block;animation:fade .18s ease}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.panel.active{animation:none}}
+.section-title{font-size:12px;font-weight:700;letter-spacing:.1em;color:var(--ink-2);text-transform:uppercase;margin:2px 2px 8px;display:flex;align-items:center;gap:8px}
+.section-title .hint{font-weight:500;letter-spacing:0;text-transform:none;color:var(--ink-3);margin-left:auto;font-size:11px}
+.card{background:var(--card);border:1px solid var(--line-2);border-radius:var(--r);box-shadow:var(--shadow)}
+.balance{display:flex;align-items:center;gap:8px;margin:0 2px 12px;font-size:13px;color:var(--ink-2);flex-wrap:wrap}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;font-weight:700;font-size:12px}
+.pill.ok{background:var(--good-bg);color:var(--good)} .pill.ng{background:var(--bad-bg);color:var(--bad)}
+.prow{display:grid;grid-template-columns:1fr 130px;gap:10px;align-items:center;padding:12px 12px;border-bottom:1px solid var(--line-2)}
+.prow:last-child{border-bottom:0}
+.pname{font-weight:700;font-size:16px;display:flex;align-items:center;gap:8px;min-width:0}
+.pname .seat{font-size:11px;font-weight:700;color:var(--ink-3);flex:none}
+input[type=number],input[type=text]{width:100%;font-family:inherit;font-size:17px;font-variant-numeric:tabular-nums;padding:11px 12px;border-radius:var(--r-sm);border:1px solid var(--line);background:var(--panel);color:var(--ink);text-align:right;-moz-appearance:textfield}
+input:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:transparent}
+input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.score-input.plus{color:var(--good)} .score-input.minus{color:var(--bad)}
+.score-input.auto{color:var(--ink-3);font-style:italic}
+.breakdown{margin-top:12px}
+.bd-row{display:grid;gap:6px;padding:9px 10px;align-items:center;font-size:13px;border-bottom:1px solid var(--line-2)}
+.bd-row:last-child{border-bottom:0}
+.bd-head{color:var(--ink-3);font-size:11px;font-weight:700}
+.bd-name{font-weight:700;font-size:14px;text-align:left;display:flex;align-items:center;gap:6px}
+.bd-row>div{text-align:right}
+.bd-row .bd-name{text-align:left}
+.rankbadge{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:6px;font-size:11px;font-weight:800;background:var(--sunk);color:var(--ink-2);flex:none}
+.rankbadge.r1{background:var(--accent);color:var(--accent-ink)}
+.total-cell{font-weight:800}
+.pos{color:var(--good)} .neg{color:var(--bad)}
+.actions{display:flex;gap:10px;margin-top:14px}
+.btn{flex:1;appearance:none;border:0;border-radius:var(--r-sm);padding:14px;font-size:15px;font-weight:800;font-family:inherit;cursor:pointer;letter-spacing:.03em}
+.btn:active{transform:translateY(1px)}
+.btn.primary{background:var(--accent);color:var(--accent-ink)}
+.btn.ghost{background:var(--sunk);color:var(--ink)}
+.btn.danger{background:var(--bad-bg);color:var(--bad)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.standings{display:grid;gap:8px}
+.stand-row{display:grid;grid-template-columns:26px 1fr auto;gap:12px;align-items:center;padding:12px 14px}
+.stand-rank{font-weight:800;color:var(--ink-3);font-size:15px}
+.stand-rank.top{color:var(--accent)}
+.stand-name{font-weight:700;font-size:16px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.stand-name small{color:var(--ink-3);font-weight:600;font-size:12px;margin-left:6px}
+.stand-val{font-size:22px;font-weight:800;text-align:right}
+.stand-val small{font-size:12px;font-weight:600;color:var(--ink-3);margin-left:3px;display:block;text-align:right}
+.rec{padding:10px 12px;border-bottom:1px solid var(--line-2)}
+.rec:last-child{border-bottom:0}
+.rec-head{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-3);font-weight:700;margin-bottom:4px}
+.rec-head .sp{margin-left:auto}
+.rec-head button{border:0;background:none;font-size:12px;font-weight:700;cursor:pointer;padding:2px 6px;border-radius:6px}
+.rec-head .edit{color:var(--accent);background:var(--sunk)}
+.rec-head .del{color:var(--bad)}
+.rec-scores{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;font-size:13px}
+.rec-scores .rs{display:flex;flex-direction:column;gap:1px}
+.rec-scores .rs b{font-weight:800;font-size:14px}
+.rec-scores .rs span{color:var(--ink-3);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.empty{padding:34px 16px;text-align:center;color:var(--ink-3);font-size:14px}
+.empty .big{font-size:34px;margin-bottom:8px}
+.checkrow{display:flex;flex-wrap:wrap;gap:8px;padding:12px 14px}
+.chk{display:flex;align-items:center;gap:6px;font-size:14px;font-weight:700;background:var(--sunk);border-radius:999px;padding:6px 12px;cursor:pointer;color:var(--ink-2)}
+.chk input{width:auto;margin:0}
+.chk.on{background:var(--bad-bg);color:var(--bad)}
+.tbl-wrap{overflow-x:auto}
+.settle{width:100%;border-collapse:collapse;font-size:14px}
+.settle th,.settle td{padding:10px 8px;text-align:right;border-bottom:1px solid var(--line-2);white-space:nowrap}
+.settle th{color:var(--ink-3);font-size:11px;font-weight:700}
+.settle td.name,.settle th.name{text-align:left;font-weight:700}
+.settle tr:last-child td{border-bottom:0}
+.settle .grand td{font-weight:800;font-size:15px}
+.settle .grand{background:var(--sunk)}
+.settle input{padding:8px 8px;font-size:15px;min-width:74px}
+.settle .rule{color:var(--ink-3);font-weight:500;font-size:11px;display:block}
+.field{display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--line-2)}
+.field:last-child{border-bottom:0}
+.field label{flex:1;font-weight:600;font-size:15px}
+.field label small{display:block;color:var(--ink-3);font-weight:500;font-size:12px}
+.field .ctl{width:130px;flex:none}
+.field .ctl input{text-align:right}
+.seg{display:inline-flex;background:var(--sunk);border-radius:10px;padding:3px;gap:2px;flex-wrap:wrap}
+.seg button{border:0;background:none;font-family:inherit;font-weight:700;font-size:14px;padding:8px 12px;border-radius:8px;color:var(--ink-2);cursor:pointer}
+.seg button.on{background:var(--accent);color:var(--accent-ink)}
+.uma-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:12px 14px}
+.uma-grid.p3{grid-template-columns:repeat(3,1fr)}
+.uma-grid .u{display:flex;flex-direction:column;gap:4px}
+.uma-grid .u span{font-size:11px;color:var(--ink-3);font-weight:700;text-align:center}
+.names-grid{display:grid;gap:8px;padding:12px 14px}
+.names-grid .n{display:grid;grid-template-columns:60px 1fr;gap:10px;align-items:center}
+.names-grid .n span{font-size:12px;color:var(--ink-3);font-weight:700}
+.names-grid .n input{text-align:left}
+.gname-field{display:flex;gap:10px;align-items:center;padding:12px 14px;border-bottom:1px solid var(--line-2)}
+.gname-field span{font-size:12px;color:var(--ink-3);font-weight:700;flex:none}
+.gname-field input{text-align:left}
+.presets{display:flex;flex-wrap:wrap;gap:8px;padding:10px 14px}
+.presets .p{display:flex;align-items:center;gap:6px;background:var(--sunk);border-radius:999px;padding:6px 6px 6px 12px;font-size:13px;font-weight:700}
+.presets .p button{border:0;background:none;cursor:pointer;font-weight:800;padding:2px 4px}
+.presets .p .use{color:var(--accent)} .presets .p .rm{color:var(--bad)}
+.hist{padding:12px 14px;border-bottom:1px solid var(--line-2)}
+.hist:last-child{border-bottom:0}
+.hist-head{display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px}
+.hist-head .d{color:var(--ink-3);font-size:12px;font-weight:600}
+.hist-head button{border:0;background:none;font-size:12px;font-weight:700;cursor:pointer;padding:2px 6px;border-radius:6px}
+.hist-head .show{color:var(--accent);background:var(--sunk);margin-left:auto}
+.hist-head .del{color:var(--bad)}
+.hist-body{margin-top:8px;font-size:13px;color:var(--ink-2)}
+.hist-body .hl{display:flex;justify-content:space-between;padding:3px 0}
+nav{position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--panel);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(5,1fr);padding-bottom:env(safe-area-inset-bottom)}
+nav button{appearance:none;border:0;background:none;font-family:inherit;color:var(--ink-3);padding:9px 2px 8px;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10.5px;font-weight:700;cursor:pointer}
+nav button .ni{font-size:19px;line-height:1}
+nav button.on{color:var(--accent)}
+.toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:999px;font-size:13px;font-weight:700;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:40;max-width:90vw;text-align:center}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(-4px)}
+.note{font-size:12px;color:var(--ink-3);margin:10px 4px 0;line-height:1.55}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;z-index:50;padding:20px}
+.modal.show{display:flex}
+.modal-box{background:var(--card);border:1px solid var(--line-2);border-radius:var(--r);padding:18px;max-width:360px;width:100%;box-shadow:var(--shadow)}
+.modal-msg{font-size:15px;font-weight:600;line-height:1.6;margin-bottom:16px;white-space:pre-wrap;color:var(--ink)}
+.modal-btns{display:flex;gap:10px}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div class="tile">中</div>
+    <div><h1>麻雀 精算</h1><small id="ruleSummary">素点を入れるだけ</small></div>
+  </div>
+  <button class="iconbtn" id="themeBtn" aria-label="テーマ切替" title="テーマ切替">◐</button>
+</header>
+<div class="gamebar" id="gameBar"></div>
+<main>
+  <section class="panel active" id="panel-input" aria-label="入力">
+    <div class="balance" id="balanceBar"></div>
+    <div class="card"><div id="inputRows"></div></div>
+    <div id="yakInput"></div>
+    <div class="actions">
+      <button class="btn ghost" id="clearInput">クリア</button>
+      <button class="btn primary" id="addRecord">この半荘を記録</button>
+    </div>
+    <div class="section-title" style="margin-top:22px">この半荘の内訳<span class="hint" id="modeHint"></span></div>
+    <div class="card breakdown" id="breakdown"></div>
+    <p class="note" id="inputNote"></p>
+  </section>
+
+  <section class="panel" id="panel-records" aria-label="記録">
+    <div class="section-title">このゲームの累計<span class="hint" id="recRuleHint"></span></div>
+    <div class="card standings" id="standings"></div>
+    <div class="section-title" style="margin-top:22px">半荘の記録<span class="hint" id="recCount"></span></div>
+    <div class="card" id="recordsList"></div>
+    <div class="actions"><button class="btn danger" id="resetSession">このゲームの記録を消す</button></div>
+  </section>
+
+  <section class="panel" id="panel-settle" aria-label="精算">
+    <div class="section-title">このゲームの精算<span class="hint" id="settleRate"></span></div>
+    <div class="card tbl-wrap"><table class="settle" id="settleTable"></table></div>
+    <p class="note" id="settleNote"></p>
+  </section>
+
+  <section class="panel" id="panel-total" aria-label="合計">
+    <div class="section-title">1日の合計<span class="hint" id="totalHint"></span></div>
+    <div class="card standings" id="dayStandings"></div>
+    <div class="actions">
+      <button class="btn ghost" id="copyResult">結果をコピー</button>
+      <button class="btn ghost" id="saveDay">この1日を保存</button>
+    </div>
+    <div class="section-title" style="margin-top:20px">ゲーム別の内訳<span class="hint">ソシー</span></div>
+    <div class="card tbl-wrap"><table class="settle" id="dayTable"></table></div>
+    <p class="note" id="totalNote"></p>
+    <div class="section-title" style="margin-top:22px">保存した日<span class="hint" id="histCount"></span></div>
+    <div class="card" id="histList"></div>
+    <div class="actions"><button class="btn danger" id="newDay">新しい日を始める</button></div>
+  </section>
+
+  <section class="panel" id="panel-settings" aria-label="設定">
+    <div class="section-title">メンバー<span class="hint">1日を通して共通</span></div>
+    <div class="card">
+      <div class="field"><label>人数</label><div class="seg" id="segPlayers"><button data-p="4">四麻</button><button data-p="3">三麻</button></div></div>
+      <div class="names-grid" id="namesGrid"></div>
+      <div class="presets" id="presetList"></div>
+      <div class="field"><label>名前プリセット<small>今の名前を保存</small></label><div class="ctl"><button class="btn ghost" id="savePreset" style="padding:10px">保存</button></div></div>
+    </div>
+
+    <div class="section-title" style="margin-top:20px">入力の設定<span class="hint">1日共通</span></div>
+    <div class="card">
+      <div class="field"><label>入力単位<small>普段は「そのまま」。省略したい時だけ「100点」（350と打つと35000）</small></label><div class="seg" id="segUnit"><button data-u="1">そのまま</button><button data-u="100">100点</button></div></div>
+      <div class="field"><label>残り1人を自動計算<small>3人入れたら4人目を補完</small></label><div class="seg" id="segAuto"><button data-a="1">ON</button><button data-a="0">OFF</button></div></div>
+    </div>
+
+    <div class="section-title" style="margin-top:20px">このゲームのルール<span class="hint" id="settingsGameName"></span></div>
+    <div class="card">
+      <div class="gname-field"><span>ゲーム名</span><input type="text" id="cfgGameName" maxlength="16"></div>
+      <div class="field"><label>配給原点<small>持ち点スタート</small></label><div class="ctl"><input type="number" id="cfgStart"></div></div>
+      <div class="field"><label>返し点<small>(返し−配給)×人数がオカ→1位へ</small></label><div class="ctl"><input type="number" id="cfgRet"></div></div>
+      <div class="uma-grid" id="umaGrid"></div>
+      <div class="field"><label>ビンタ単価<small>0で無効</small></label><div class="ctl"><input type="number" id="cfgBinta"></div></div>
+      <div class="field"><label>焼き鳥単価<small>点・0で無効。他全員へ支払い</small></label><div class="ctl"><input type="number" id="cfgYakitori"></div></div>
+      <div class="field"><label>初期チップ<small>枚</small></label><div class="ctl"><input type="number" id="cfgInitChip"></div></div>
+      <div class="field"><label>点/チップ<small>1枚あたりの点</small></label><div class="ctl"><input type="number" id="cfgPointPerChip"></div></div>
+      <div class="field"><label>ソシー<small>最終倍率（×）</small></label><div class="ctl"><input type="number" id="cfgRate"></div></div>
+    </div>
+    <div class="actions">
+      <button class="btn ghost" id="dupGame">このルールで新しいゲーム</button>
+      <button class="btn danger" id="delGame">このゲームを削除</button>
+    </div>
+    <div class="actions">
+      <button class="btn ghost" id="saveDefault">このルールを規定値に</button>
+      <button class="btn ghost" id="restoreDefaults">規定値に戻す</button>
+    </div>
+    <p class="note">ルールはゲームごとに独立。ここを変えても他ゲームや過去記録は変わりません。別ルールで打つときは「このルールで新しいゲーム」を押してから調整してください。</p>
+  </section>
+</main>
+<nav>
+  <button data-tab="input" class="on"><span class="ni">🀙</span>入力</button>
+  <button data-tab="records"><span class="ni">📋</span>記録</button>
+  <button data-tab="settle"><span class="ni">🧮</span>精算</button>
+  <button data-tab="total"><span class="ni">🏁</span>合計</button>
+  <button data-tab="settings"><span class="ni">⚙️</span>設定</button>
+</nav>
+<div class="toast" id="toast"></div>
+<div class="modal" id="modal"><div class="modal-box"><div class="modal-msg" id="modalMsg"></div><div class="modal-btns"><button class="btn ghost" id="modalNo">キャンセル</button><button class="btn danger" id="modalYes">OK</button></div></div></div>
+<script>
+"use strict";
+const LS_KEY="mahjong-seisan-v3";
+const SEATS=["東","南","西","北"];
+const HARD_RULE=()=>({start:35000,ret:35000,uma:[30000,-10000,-20000,0],bintaUnit:0,yakitoriUnit:0,initChip:2000,pointPerChip:1000,rate:10});
+let DEFRULE=null;
+function DEFAULT_RULE(){ return DEFRULE?JSON.parse(JSON.stringify(DEFRULE)):HARD_RULE(); }
+
+let state=load();
+if(state.defaultRule) DEFRULE=state.defaultRule;
+
+function freshGame(label,rule,P,seq){ return {id:seq,label:label,rule:rule||DEFAULT_RULE(),records:[],chips:{final:Array(P).fill(""),borrow:Array(P).fill("")},current:Array(P).fill(""),curYak:Array(P).fill(false)}; }
+function load(){
+  try{ const s=JSON.parse(localStorage.getItem(LS_KEY)); if(s&&s.games) return normalize(s); }catch(e){}
+  try{ const v2=JSON.parse(localStorage.getItem("mahjong-seisan-v2")); if(v2&&v2.games) return normalize(migrateV2(v2)); }catch(e){}
+  try{ const v1=JSON.parse(localStorage.getItem("mahjong-seisan-v1")); if(v1&&v1.config) return normalize(migrateV1(v1)); }catch(e){}
+  const P=4;
+  return normalize({players:P,names:["プレイヤー1","プレイヤー2","プレイヤー3","プレイヤー4"],seq:2,games:[freshGame("ゲーム1",DEFAULT_RULE(),P,1)],activeId:1});
+}
+function migrateV2(v){
+  (v.games||[]).forEach(g=>{ const r=g.rule||{}; if(r.genten!=null&&r.start==null){ r.start=r.genten; r.ret=r.genten; } });
+  return v;
+}
+function migrateV1(o){
+  const P=o.config.players===3?3:4;
+  const names=(o.config.names||[]).slice(0,P); while(names.length<P) names.push("プレイヤー"+(names.length+1));
+  const gen=o.config.genten||35000;
+  const rule={start:gen,ret:gen,uma:(o.config.uma||[30000,-10000,-20000,0]).slice(0,4),bintaUnit:o.config.bintaUnit||0,yakitoriUnit:0,initChip:o.config.initChip||2000,pointPerChip:o.config.pointPerChip||1000,rate:o.config.rate||10};
+  const g=freshGame("ゲーム1",rule,P,1); g.records=o.records||[];
+  if(o.chips){ g.chips.final=(o.chips.final||g.chips.final).slice(0,P); g.chips.borrow=(o.chips.borrow||g.chips.borrow).slice(0,P); }
+  g.current=(o.current||g.current).slice(0,P);
+  return {players:P,names:names,seq:2,games:[g],activeId:1};
+}
+function normalize(s){
+  const P=s.players===3?3:4; s.players=P;
+  s.names=(s.names||[]).slice(0,P); while(s.names.length<P) s.names.push("プレイヤー"+(s.names.length+1));
+  s.namePresets=s.namePresets||[]; s.inputUnit=[1,100].includes(s.inputUnit)?s.inputUnit:1; s.defaultRule=s.defaultRule||null;
+  s.autoFill=s.autoFill!==false; s.history=s.history||[]; s.seq=s.seq||1;
+  s.games=(s.games&&s.games.length?s.games:[freshGame("ゲーム1",DEFAULT_RULE(),P,s.seq++)]);
+  s.games.forEach((g,i)=>{
+    if(g.id==null) g.id=s.seq++;
+    g.label=g.label||("ゲーム"+(i+1));
+    g.rule=Object.assign(DEFAULT_RULE(),g.rule||{});
+    g.rule.uma=(g.rule.uma||[]).slice(0,4); while(g.rule.uma.length<4) g.rule.uma.push(0);
+    g.records=(g.records||[]).map(r=>Array.isArray(r)?{s:fixLen(r,P,""),y:Array(P).fill(false)}:{s:fixLen(r.s,P,""),y:fixLen(r.y,P,false)});
+    g.chips=g.chips||{}; g.chips.final=fixLen(g.chips.final,P,""); g.chips.borrow=fixLen(g.chips.borrow,P,"");
+    g.current=fixLen(g.current,P,""); g.curYak=fixLen(g.curYak||g.yakitori,P,false); delete g.yakitori;
+  });
+  if(!s.games.some(g=>g.id===s.activeId)) s.activeId=s.games[0].id;
+  return s;
+}
+function fixLen(a,n,f){ a=(a||[]).slice(0,n); while(a.length<n) a.push(f); return a; }
+function save(){ localStorage.setItem(LS_KEY,JSON.stringify(state)); }
+const P=()=>state.players;
+const NM=i=>state.names[i];
+const UNIT=()=>state.inputUnit||1;
+function game(){ return state.games.find(g=>g.id===state.activeId)||state.games[0]; }
+const rule=()=>game().rule;
+
+/* ---------- 計算 ---------- */
+function num(v){ if(v===null||v===undefined) return null; const t=String(v).trim(); if(t==="") return null; const n=Number(t); return isNaN(n)?null:n; }
+function calcHanchan(scores,r,yak){
+  const idx=[]; for(let i=0;i<scores.length;i++) if(scores[i]!=null) idx.push(i);
+  const N=idx.length; const out=scores.map(()=>null);
+  if(N===0) return {rows:out,N:0,sum:0,target:0,balanced:true};
+  let countNeg=0; for(const i of idx) if((scores[i]-r.ret)<0) countNeg++;
+  const countNonNeg=N-countNeg;
+  const ranks={}; for(const i of idx) ranks[i]=1+idx.filter(j=>scores[j]>scores[i]).length;
+  const firsts=idx.filter(i=>ranks[i]===1);
+  const okaEach=firsts.length?((r.ret-r.start)*N)/firsts.length:0;
+  const yu=r.yakitoriUnit||0; let nY=0; if(yu&&yak) for(const i of idx) if(yak[i]) nY++; const nN=N-nY;
+  for(const i of idx){
+    const rank=ranks[i]; const soten=scores[i]-r.ret;
+    const below=N-rank, above=rank-1;
+    let binta=r.bintaUnit*(below-above); binta += (soten>=0)?r.bintaUnit*countNeg:-r.bintaUnit*countNonNeg;
+    const uma=r.uma[rank-1]!=null?r.uma[rank-1]:0;
+    const oka=rank===1?okaEach:0;
+    const yk=yu?((yak&&yak[i])?-yu*nN:yu*nY):0;
+    out[i]={rank,soten,uma,binta,oka,yak:yk,total:soten+uma+binta+oka+yk};
+  }
+  let sum=0; for(const i of idx) sum+=scores[i];
+  return {rows:out,N,sum,target:r.start*N,balanced:sum===r.start*N};
+}
+function gameTotalsPts(g){
+  const tot=Array(P()).fill(0);
+  for(const rec of g.records){ const rows=calcHanchan(rec.s.map(num),g.rule,rec.y).rows; for(let i=0;i<P();i++) if(rows[i]) tot[i]+=rows[i].total; }
+  return tot;
+}
+function gameSettle(g){
+  const r=g.rule; const tot=gameTotalsPts(g); const totK=tot.map(v=>v/1000);
+  const finals=g.chips.final.map(num), borrows=g.chips.borrow.map(v=>num(v)||0);
+  const chipDiff=finals.map((f,i)=> f==null?null : f-r.initChip-borrows[i]);
+  const inclK=totK.map((t,i)=> t+(chipDiff[i]||0)*r.pointPerChip/1000);
+  const sochi=inclK.map(v=>v*r.rate);
+  return {tot,totK,chipDiff,inclK,sochi};
+}
+function daySettle(){
+  const per=state.games.map(g=>gameSettle(g));
+  const daySochi=Array(P()).fill(0), dayTotK=Array(P()).fill(0);
+  per.forEach(s=>{ for(let i=0;i<P();i++){ daySochi[i]+=s.sochi[i]; dayTotK[i]+=s.totK[i]; } });
+  return {per,daySochi,dayTotK};
+}
+
+/* ---------- helpers ---------- */
+function fmt(n,dec){ dec=dec||0; if(n==null||isNaN(n)) return "–"; const p=Math.pow(10,dec); const r=Math.round(n*p)/p; return r.toLocaleString("ja-JP",{maximumFractionDigits:dec}); }
+function signed(n,dec){ if(n==null||isNaN(n)) return "–"; return (n>0?"+":n<0?"−":"±")+fmt(Math.abs(n),dec); }
+function cls(n){ return n>0?"pos":n<0?"neg":""; }
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m])); }
+function ruleText(r){ let t=`配給${fmt(r.start/1000)}k`; if(r.ret!==r.start) t+=`/返し${fmt(r.ret/1000)}k`; t+=`・ウマ${r.uma.slice(0,P()).map(v=>fmt(v/1000)).join("/")}`; return t; }
+function hasOka(r){ return r.ret!==r.start; }
+function effectiveCurrent(g){
+  const arr=g.current.slice();
+  if(state.autoFill){
+    const empties=[],filled=[];
+    for(let i=0;i<P();i++){ if(arr[i]===""||arr[i]==null) empties.push(i); else filled.push(i); }
+    if(empties.length===1 && filled.length===P()-1){
+      let sum=0,ok=true; for(const i of filled){ const v=num(arr[i]); if(v==null){ok=false;break;} sum+=v; }
+      if(ok) arr[empties[0]]=String(g.rule.start*P()-sum);
+    }
+  }
+  return arr;
+}
+
+/* ---------- ゲームバー ---------- */
+function renderGameBar(){
+  const bar=document.getElementById("gameBar"); bar.innerHTML="";
+  state.games.forEach(g=>{
+    const b=document.createElement("button"); b.className="gchip"+(g.id===state.activeId?" on":""); b.textContent=g.label;
+    b.addEventListener("click",()=>{ if(g.id!==state.activeId){ state.activeId=g.id; save(); onGameSwitched(); } });
+    bar.appendChild(b);
+  });
+  const add=document.createElement("button"); add.className="gchip add"; add.textContent="＋ゲーム";
+  add.addEventListener("click",()=>addGame(true)); bar.appendChild(add);
+}
+function addGame(clone){
+  const r=clone?JSON.parse(JSON.stringify(rule())):DEFAULT_RULE();
+  const g=freshGame("ゲーム"+(state.games.length+1),r,P(),state.seq++); state.games.push(g); state.activeId=g.id; save();
+  onGameSwitched(); switchTab("input"); toast("新しいゲームを追加");
+}
+function onGameSwitched(){ buildInputRows(); recomputeInput(); renderGameBar(); renderActiveTab(); updateRuleSummary(); }
+
+/* ---------- 入力 ---------- */
+let inputEls=[];
+const inputRows=document.getElementById("inputRows");
+function buildInputRows(){
+  inputRows.innerHTML=""; inputEls=[]; const g=game();
+  for(let i=0;i<P();i++){
+    const row=document.createElement("div"); row.className="prow";
+    row.innerHTML=`<div class="pname"><span class="seat">${SEATS[i]}</span><span>${escapeHtml(NM(i))}</span></div>`;
+    const wrap=document.createElement("div"); const inp=document.createElement("input");
+    inp.type="number"; inp.inputMode="numeric"; inp.className="score-input"; inp.placeholder=UNIT()===1?"持ち点":"持ち点(×"+UNIT()+")";
+    inp.value=(g.current[i]===""||g.current[i]==null)?"":String(num(g.current[i])/UNIT());
+    inp.addEventListener("input",()=>{ const pv=num(inp.value); g.current[i]=(pv==null)?"":String(pv*UNIT()); colorInput(inp,i); save(); recomputeInput(); });
+    inputEls.push(inp); colorInput(inp,i); wrap.appendChild(inp); row.appendChild(wrap); inputRows.appendChild(row);
+  }
+}
+function colorInput(inp,i){ const n=num(game().current[i]); inp.classList.remove("plus","minus","auto"); if(n!=null){ if(n-rule().ret>0) inp.classList.add("plus"); else if(n-rule().ret<0) inp.classList.add("minus"); } }
+function recomputeInput(){
+  const g=game(); const eff=effectiveCurrent(g); const res=calcHanchan(eff.map(num),g.rule,g.curYak);
+  renderYakInput();
+  // auto placeholder
+  for(let i=0;i<P();i++){ if(inputEls[i]){ if((g.current[i]===""||g.current[i]==null)&&eff[i]!==""&&eff[i]!=null){ inputEls[i].placeholder="→ "+fmt(num(eff[i])/UNIT(),UNIT()===1?0:2); inputEls[i].classList.add("auto"); } else { inputEls[i].placeholder=UNIT()===1?"持ち点":"持ち点(×"+UNIT()+")"; if(g.current[i]!=="") inputEls[i].classList.remove("auto"); } } }
+  const bar=document.getElementById("balanceBar");
+  const unitTag=UNIT()!==1?`<span class="pill" style="background:var(--warn);color:#fff">入力単位 ×${UNIT()}（例: 35→${fmt(35*UNIT())}）</span>`:"";
+  if(res.N===0){ bar.innerHTML=unitTag+`<span class="pill">未入力</span><span>持ち点を入力してください</span>`; }
+  else{ const ok=res.balanced;
+    bar.innerHTML=unitTag+`<span class="pill ${ok?"ok":"ng"}">${ok?"合計OK":"合計ズレ"}</span><span>合計 <b class="num">${fmt(res.sum)}</b> / 目標 <b class="num">${fmt(res.target)}</b>`+(ok?``:` <b class="num" style="color:var(--bad)">(${signed(res.sum-res.target)})</b>`)+`</span>`; }
+  const oka=hasOka(g.rule), binta=g.rule.bintaUnit!==0, yakon=g.rule.yakitoriUnit>0;
+  const cols=["素点"]; if(oka) cols.push("オカ"); cols.push("ウマ"); if(binta) cols.push("ビンタ"); if(yakon) cols.push("焼"); cols.push("計");
+  const gt=`1fr repeat(${cols.length},minmax(42px,1fr))`;
+  let h=`<div class="bd-row bd-head" style="grid-template-columns:${gt}"><div class="bd-name">プレイヤー</div>`+cols.map(c=>`<div>${c}</div>`).join("")+`</div>`;
+  for(let i=0;i<P();i++){ const r=res.rows[i];
+    if(!r){ h+=`<div class="bd-row" style="grid-template-columns:1fr 1fr"><div class="bd-name" style="opacity:.5">${escapeHtml(NM(i))}</div><div style="color:var(--ink-3)">—</div></div>`; continue; }
+    let cells=`<div class="${cls(r.soten)}">${signed(r.soten)}</div>`;
+    if(oka) cells+=`<div class="${cls(r.oka)}">${r.oka?signed(r.oka):"0"}</div>`;
+    cells+=`<div class="${cls(r.uma)}">${signed(r.uma)}</div>`;
+    if(binta) cells+=`<div class="${cls(r.binta)}">${r.binta?signed(r.binta):"0"}</div>`;
+    if(yakon) cells+=`<div class="${cls(r.yak)}">${r.yak?signed(r.yak):"0"}</div>`;
+    cells+=`<div class="total-cell ${cls(r.total)}">${signed(r.total)}</div>`;
+    h+=`<div class="bd-row" style="grid-template-columns:${gt}"><div class="bd-name"><span class="rankbadge ${r.rank===1?"r1":""}">${r.rank}</span>${escapeHtml(NM(i))}</div>${cells}</div>`;
+  }
+  document.getElementById("breakdown").innerHTML=h;
+  document.getElementById("addRecord").disabled=(res.N===0);
+  document.getElementById("modeHint").textContent=g.records.length?`${g.label}：記録${g.records.length}`:`${g.label}`;
+  document.getElementById("inputNote").textContent = `各自の持ち点（終了点）をそのまま入力（入力単位: ${UNIT()===1?"そのまま":UNIT()+"点"}）。返し引き・ウマ・オカは自動計算。`+(state.autoFill?"3人入れると残り1人を自動計算。":"1人空欄ならサンマ扱い。");
+}
+function renderYakInput(){
+  const box=document.getElementById("yakInput"); const g=game();
+  if(!(g.rule.yakitoriUnit>0)){ box.innerHTML=""; return; }
+  let h=`<div class="section-title" style="margin-top:14px">焼き鳥<span class="hint">この半荘・単価${fmt(g.rule.yakitoriUnit)}点</span></div><div class="card"><div class="checkrow">`;
+  for(let i=0;i<P();i++) h+=`<label class="chk ${g.curYak[i]?"on":""}"><input type="checkbox" data-yi="${i}" ${g.curYak[i]?"checked":""}> ${escapeHtml(NM(i))}</label>`;
+  h+=`</div></div>`; box.innerHTML=h;
+  box.querySelectorAll("[data-yi]").forEach(inp=>inp.addEventListener("change",()=>{ game().curYak[+inp.dataset.yi]=inp.checked; save(); recomputeInput(); }));
+}
+document.getElementById("clearInput").addEventListener("click",()=>{ game().current=Array(P()).fill(""); game().curYak=Array(P()).fill(false); save(); buildInputRows(); recomputeInput(); });
+document.getElementById("addRecord").addEventListener("click",()=>{
+  const g=game(); const eff=effectiveCurrent(g); if(calcHanchan(eff.map(num),g.rule,g.curYak).N===0) return;
+  g.records.push({s:eff.slice(),y:g.curYak.slice()}); g.current=Array(P()).fill(""); g.curYak=Array(P()).fill(false); save(); buildInputRows(); recomputeInput(); toast("記録しました");
+});
+
+/* ---------- 記録 ---------- */
+function renderRecords(){
+  const g=game(); document.getElementById("recRuleHint").textContent=ruleText(g.rule);
+  const tot=gameTotalsPts(g); const order=tot.map((v,i)=>({i,v})).sort((a,b)=>b.v-a.v);
+  document.getElementById("standings").innerHTML=order.map((o,idx)=>`<div class="stand-row"><div class="stand-rank ${idx===0&&o.v!==0?"top":""}">${idx+1}</div><div class="stand-name">${escapeHtml(NM(o.i))}<small>${SEATS[o.i]}</small></div><div class="stand-val ${cls(o.v)}">${signed(o.v/1000,1)}<small>千点</small></div></div>`).join("");
+  const list=document.getElementById("recordsList");
+  document.getElementById("recCount").textContent=g.records.length?`${g.records.length}半荘`:"";
+  if(!g.records.length){ list.innerHTML=`<div class="empty"><div class="big">🀫</div>まだ記録がありません<br>入力タブで「この半荘を記録」</div>`; return; }
+  let h="";
+  g.records.forEach((rec,ri)=>{ const rows=calcHanchan(rec.s.map(num),g.rule,rec.y).rows;
+    const yaks=[]; for(let i=0;i<P();i++) if(rec.y[i]) yaks.push(NM(i));
+    h+=`<div class="rec"><div class="rec-head">第 ${ri+1} 半荘 ${yaks.length?`<span style="color:var(--bad)">焼: ${escapeHtml(yaks.join("・"))}</span>`:""}<span class="sp"></span><button class="edit" data-edit="${ri}">編集</button><button class="del" data-del="${ri}">削除</button></div><div class="rec-scores">`;
+    for(let i=0;i<P();i++){ const c=rows[i]; h+=`<div class="rs"><span>${escapeHtml(NM(i))}</span>`+(c?`<b class="${cls(c.total)}">${signed(c.total/1000,1)}</b>`:`<b style="color:var(--ink-3)">—</b>`)+`</div>`; }
+    h+=`</div></div>`;
+  });
+  list.innerHTML=h;
+  list.querySelectorAll("[data-del]").forEach(b=>b.addEventListener("click",()=>{ game().records.splice(+b.dataset.del,1); save(); renderRecords(); recomputeInput(); }));
+  list.querySelectorAll("[data-edit]").forEach(b=>b.addEventListener("click",()=>{ const ri=+b.dataset.edit; const rec=game().records.splice(ri,1)[0]; game().current=fixLen(rec.s.map(x=>x==null?"":String(x)),P(),""); game().curYak=fixLen(rec.y,P(),false); save(); buildInputRows(); switchTab("input"); toast("編集中：直して「記録」"); }));
+}
+document.getElementById("resetSession").addEventListener("click",()=>{ const g=game(); if(!g.records.length){ toast("記録は空です"); return; } confirmDialog(`「${g.label}」の記録をすべて削除します。よろしいですか？`,()=>{ g.records=[]; save(); renderRecords(); recomputeInput(); toast("削除しました"); }); });
+
+/* ---------- 精算 ---------- */
+function renderSettle(){
+  const g=game(), r=g.rule; document.getElementById("settleRate").textContent=`ソシー ×${fmt(r.rate)}`;
+  const table=document.getElementById("settleTable");
+  let head=`<thead><tr><th class="name">項目</th>`; for(let i=0;i<P();i++) head+=`<th>${escapeHtml(NM(i))}</th>`; head+=`<th>差</th></tr></thead>`;
+  let body=`<tbody>`;
+  body+=`<tr><td class="name">総得点<small class="rule">千点</small></td>`; for(let i=0;i<P();i++) body+=`<td class="total-cell" id="st-total-${i}"></td>`; body+=`<td></td></tr>`;
+  body+=`<tr><td class="name">最終チップ</td>`; for(let i=0;i<P();i++) body+=`<td><input type="number" inputmode="numeric" data-chip="final" data-i="${i}" value="${g.chips.final[i]??""}" placeholder="${fmt(r.initChip)}"></td>`; body+=`<td class="num" id="chipFinalDiff"></td></tr>`;
+  body+=`<tr><td class="name">借チップ</td>`; for(let i=0;i<P();i++) body+=`<td><input type="number" inputmode="numeric" data-chip="borrow" data-i="${i}" value="${g.chips.borrow[i]??""}" placeholder="0"></td>`; body+=`<td></td></tr>`;
+  body+=`<tr><td class="name">チップ差<small class="rule">枚</small></td>`; for(let i=0;i<P();i++) body+=`<td id="st-diff-${i}"></td>`; body+=`<td></td></tr>`;
+  body+=`<tr><td class="name">チップ込み合計<small class="rule">千点</small></td>`; for(let i=0;i<P();i++) body+=`<td id="st-incl-${i}"></td>`; body+=`<td></td></tr>`;
+  body+=`<tr class="grand"><td class="name">ソシー</td>`; for(let i=0;i<P();i++) body+=`<td class="total-cell" id="st-sochi-${i}"></td>`; body+=`<td></td></tr></tbody>`;
+  table.innerHTML=head+body;
+  table.querySelectorAll("input[data-chip]").forEach(inp=>inp.addEventListener("input",()=>{ game().chips[inp.dataset.chip][+inp.dataset.i]=inp.value; save(); updateSettleDerived(); }));
+  updateSettleDerived();
+}
+function setCell(id,val,dec){ const el=document.getElementById(id); if(!el) return; el.textContent=signed(val,dec); el.classList.remove("pos","neg"); if(val>0)el.classList.add("pos"); else if(val<0)el.classList.add("neg"); }
+function updateSettleDerived(){
+  const g=game(), r=g.rule, s=gameSettle(g);
+  for(let i=0;i<P();i++){ setCell(`st-total-${i}`,s.totK[i],1);
+    const d=document.getElementById(`st-diff-${i}`); if(d){ d.textContent=s.chipDiff[i]==null?"–":signed(s.chipDiff[i]); d.classList.remove("pos","neg"); if(s.chipDiff[i]>0)d.classList.add("pos"); else if(s.chipDiff[i]<0)d.classList.add("neg"); }
+    setCell(`st-incl-${i}`,s.inclK[i],1); setCell(`st-sochi-${i}`,s.sochi[i],0); }
+  const finals=g.chips.final.map(num), borrows=g.chips.borrow.map(v=>num(v)||0);
+  let fsum=0,fcnt=0; finals.forEach((f,i)=>{ if(f!=null){ fsum+=f-r.initChip-borrows[i]; fcnt++; } });
+  const fd=document.getElementById("chipFinalDiff"); if(fd) fd.innerHTML=fcnt?`<span class="${fsum===0?"pos":"neg"}">${signed(fsum)}</span>`:"";
+  const balanced=s.tot.reduce((a,b)=>a+b,0)===0;
+  document.getElementById("settleNote").innerHTML=`チップ差 = 最終チップ − 初期チップ(${fmt(r.initChip)}) − 借チップ。チップ込み合計 = 総得点 + チップ差 × ${fmt(r.pointPerChip)}/1000。ソシー = チップ込み合計 × ${fmt(r.rate)}。`+(g.records.length&&!balanced?`<br><b style="color:var(--warn)">※ 総得点の合計が0になっていません。素点の合計ズレ等を確認してください。</b>`:``);
+}
+
+/* ---------- 合計 ---------- */
+function renderTotal(){
+  const d=daySettle(); document.getElementById("totalHint").textContent=`${state.games.length}ゲーム`;
+  const order=d.daySochi.map((v,i)=>({i,v})).sort((a,b)=>b.v-a.v);
+  document.getElementById("dayStandings").innerHTML=order.map((o,idx)=>`<div class="stand-row"><div class="stand-rank ${idx===0&&o.v!==0?"top":""}">${idx+1}</div><div class="stand-name">${escapeHtml(NM(o.i))}<small>${SEATS[o.i]}</small></div><div class="stand-val ${cls(o.v)}">${signed(o.v)}<small>ソシー / 総得点${signed(d.dayTotK[o.i],1)}</small></div></div>`).join("");
+  const t=document.getElementById("dayTable");
+  let head=`<thead><tr><th class="name">ゲーム</th>`; for(let i=0;i<P();i++) head+=`<th>${escapeHtml(NM(i))}</th>`; head+=`</tr></thead>`;
+  let body=`<tbody>`;
+  state.games.forEach((g,gi)=>{ body+=`<tr><td class="name">${escapeHtml(g.label)}<small class="rule">${ruleText(g.rule)}</small></td>`; for(let i=0;i<P();i++){ const v=d.per[gi].sochi[i]; body+=`<td class="${cls(v)}">${signed(v)}</td>`; } body+=`</tr>`; });
+  body+=`<tr class="grand"><td class="name">合計</td>`; for(let i=0;i<P();i++) body+=`<td class="total-cell ${cls(d.daySochi[i])}">${signed(d.daySochi[i])}</td>`; body+=`</tr></tbody>`;
+  t.innerHTML=head+body;
+  const bal=d.daySochi.reduce((a,b)=>a+b,0);
+  document.getElementById("totalNote").innerHTML=`各ゲームの「ソシー（チップ込み合計×倍率）」を全ゲーム合算した、解散前の最終精算です。`+(Math.abs(bal)>0.5?`<br><b style="color:var(--warn)">※ 合計が0になっていません（${signed(bal)}）。素点合計やチップ入力を確認してください。</b>`:``);
+  renderHistory();
+}
+function dayText(){
+  const d=daySettle(); const lines=[];
+  lines.push("🀄麻雀 精算  "+new Date().toLocaleString("ja-JP",{year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"}));
+  lines.push("メンバー: "+state.names.slice(0,P()).join(" / "));
+  state.games.forEach((g,gi)=>{ lines.push(""); lines.push("【"+g.label+"】"+ruleText(g.rule));
+    for(let i=0;i<P();i++) lines.push("  "+NM(i)+"  ソシー"+signed(d.per[gi].sochi[i])); });
+  lines.push(""); lines.push("=== 1日の合計 ===");
+  d.daySochi.map((v,i)=>({i,v})).sort((a,b)=>b.v-a.v).forEach((o,idx)=>{ lines.push((idx+1)+"位 "+NM(o.i)+"  ソシー"+signed(o.v)+"（総得点"+signed(d.dayTotK[o.i],1)+"千）"); });
+  return lines.join("\n");
+}
+document.getElementById("copyResult").addEventListener("click",()=>{
+  const txt=dayText();
+  const done=()=>toast("結果をコピーしました"); const fail=()=>{ try{ const ta=document.createElement("textarea"); ta.value=txt; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove(); done(); }catch(e){ toast("コピーできませんでした"); } };
+  if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done).catch(fail); else fail();
+});
+document.getElementById("saveDay").addEventListener("click",()=>{ saveDayToHistory(); toast("この1日を保存しました"); renderHistory(); });
+document.getElementById("newDay").addEventListener("click",()=>{
+  confirmDialog("新しい日を始めます。今の内容は「保存した日」に残してからリセットします。よろしいですか？",()=>{
+    const hasData=state.games.some(g=>g.records.length);
+    if(hasData) saveDayToHistory();
+    state.games=[freshGame("ゲーム1",DEFAULT_RULE(),P(),state.seq++)]; state.activeId=state.games[0].id; save();
+    onGameSwitched(); switchTab("input"); toast("新しい日を始めました");
+  });
+});
+function saveDayToHistory(){
+  const d=daySettle();
+  const snap={at:Date.now(),label:new Date().toLocaleString("ja-JP",{year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"}),
+    names:state.names.slice(0,P()),players:P(),
+    perGame:state.games.map((g,gi)=>({label:g.label,rule:ruleText(g.rule),sochi:d.per[gi].sochi.slice()})),
+    daySochi:d.daySochi.slice(),dayTotK:d.dayTotK.slice()};
+  state.history.unshift(snap); if(state.history.length>50) state.history.length=50; save();
+}
+function renderHistory(){
+  const el=document.getElementById("histList"); const H=state.history;
+  document.getElementById("histCount").textContent=H.length?`${H.length}件`:"";
+  if(!H.length){ el.innerHTML=`<div class="empty" style="padding:22px">保存した日はまだありません</div>`; return; }
+  el.innerHTML=H.map((s,hi)=>{
+    const ord=s.daySochi.map((v,i)=>({i,v})).sort((a,b)=>b.v-a.v);
+    const top=ord[0]!=null?`${escapeHtml(s.names[ord[0].i]||"")} ${signed(ord[0].v)}`:"";
+    const bodyLines=ord.map((o,idx)=>`<div class="hl"><span>${idx+1}位 ${escapeHtml(s.names[o.i]||"")}</span><span class="${cls(o.v)}">${signed(o.v)}（総得点${signed(s.dayTotK[o.i],1)}千）</span></div>`).join("");
+    return `<div class="hist"><div class="hist-head"><span>${escapeHtml(s.label)}</span><span class="d">${s.perGame.length}G・1位 ${top}</span><button class="show" data-h="${hi}">表示</button><button class="del" data-hd="${hi}">削除</button></div><div class="hist-body" id="hb-${hi}" style="display:none">${bodyLines}</div></div>`;
+  }).join("");
+  el.querySelectorAll("[data-h]").forEach(b=>b.addEventListener("click",()=>{ const bd=document.getElementById("hb-"+b.dataset.h); bd.style.display=bd.style.display==="none"?"block":"none"; b.textContent=bd.style.display==="none"?"表示":"隠す"; }));
+  el.querySelectorAll("[data-hd]").forEach(b=>b.addEventListener("click",()=>{ confirmDialog("この保存を削除しますか？",()=>{ state.history.splice(+b.dataset.hd,1); save(); renderHistory(); }); }));
+}
+
+/* ---------- 設定 ---------- */
+function renderSettings(){
+  const r=rule();
+  document.querySelectorAll("#segPlayers button").forEach(b=>b.classList.toggle("on",+b.dataset.p===state.players));
+  document.querySelectorAll("#segUnit button").forEach(b=>b.classList.toggle("on",+b.dataset.u===UNIT()));
+  document.querySelectorAll("#segAuto button").forEach(b=>b.classList.toggle("on",(+b.dataset.a===1)===state.autoFill));
+  const ng=document.getElementById("namesGrid"); ng.innerHTML="";
+  for(let i=0;i<state.players;i++){ const div=document.createElement("div"); div.className="n"; div.innerHTML=`<span>${SEATS[i]}家</span>`;
+    const inp=document.createElement("input"); inp.type="text"; inp.value=state.names[i]; inp.maxLength=12;
+    inp.addEventListener("input",()=>{ state.names[i]=inp.value; save(); buildInputRows(); }); div.appendChild(inp); ng.appendChild(div); }
+  renderPresets();
+  document.getElementById("settingsGameName").textContent=game().label;
+  const gn=document.getElementById("cfgGameName"); gn.value=game().label;
+  gn.oninput=()=>{ game().label=gn.value||"ゲーム"; save(); renderGameBar(); updateRuleSummary(); document.getElementById("settingsGameName").textContent=game().label; };
+  bindNum("cfgStart","start"); bindNum("cfgRet","ret"); bindNum("cfgBinta","bintaUnit"); bindNum("cfgYakitori","yakitoriUnit"); bindNum("cfgInitChip","initChip"); bindNum("cfgPointPerChip","pointPerChip"); bindNum("cfgRate","rate");
+  const ug=document.getElementById("umaGrid"); ug.className="uma-grid"+(state.players===3?" p3":""); ug.innerHTML="";
+  for(let i=0;i<state.players;i++){ const u=document.createElement("div"); u.className="u"; u.innerHTML=`<span>${i+1}位</span>`;
+    const inp=document.createElement("input"); inp.type="number"; inp.value=r.uma[i];
+    inp.addEventListener("input",()=>{ rule().uma[i]=num(inp.value)||0; save(); recomputeInput(); updateRuleSummary(); }); u.appendChild(inp); ug.appendChild(u); }
+  const dg=document.getElementById("delGame"); dg.disabled=(state.games.length<=1); dg.textContent="「"+game().label+"」を削除";
+  updateRuleSummary();
+}
+function renderPresets(){
+  const el=document.getElementById("presetList");
+  el.innerHTML=state.namePresets.map((p,pi)=>`<span class="p">${escapeHtml(p.slice(0,P()).join("・"))}<button class="use" data-use="${pi}">使う</button><button class="rm" data-rm="${pi}">×</button></span>`).join("")||`<span style="color:var(--ink-3);font-size:12px">プリセットなし</span>`;
+  el.querySelectorAll("[data-use]").forEach(b=>b.addEventListener("click",()=>{ const p=state.namePresets[+b.dataset.use]; for(let i=0;i<P();i++) state.names[i]=p[i]||state.names[i]; save(); buildInputRows(); renderSettings(); toast("名前を適用"); }));
+  el.querySelectorAll("[data-rm]").forEach(b=>b.addEventListener("click",()=>{ state.namePresets.splice(+b.dataset.rm,1); save(); renderPresets(); }));
+}
+document.getElementById("savePreset").addEventListener("click",()=>{ const names=state.names.slice(0,P()); if(state.namePresets.some(p=>p.slice(0,P()).join("|")===names.join("|"))){ toast("同じ組が既にあります"); return; } state.namePresets.unshift(names); if(state.namePresets.length>20) state.namePresets.length=20; save(); renderPresets(); toast("プリセット保存"); });
+function bindNum(id,key){ const el=document.getElementById(id); el.value=rule()[key]; el.oninput=()=>{ rule()[key]=num(el.value)||0; save(); recomputeInput(); updateRuleSummary(); }; }
+document.querySelectorAll("#segPlayers button").forEach(b=>b.addEventListener("click",()=>{ const p=+b.dataset.p; if(p===state.players) return; confirmDialog("人数を変えると全ゲーム共通で切り替わります。よろしいですか？",()=>{ state.players=p; state=normalize(state); save(); buildInputRows(); recomputeInput(); renderSettings(); renderGameBar(); }); }));
+document.querySelectorAll("#segUnit button").forEach(b=>b.addEventListener("click",()=>{ state.inputUnit=+b.dataset.u; save(); buildInputRows(); recomputeInput(); renderSettings(); }));
+document.querySelectorAll("#segAuto button").forEach(b=>b.addEventListener("click",()=>{ state.autoFill=(+b.dataset.a===1); save(); recomputeInput(); renderSettings(); }));
+document.getElementById("dupGame").addEventListener("click",()=>addGame(true));
+document.getElementById("delGame").addEventListener("click",()=>{ if(state.games.length<=1) return; const g=game(); confirmDialog(`「${g.label}」を削除します（記録も消えます）。よろしいですか？`,()=>{ state.games=state.games.filter(x=>x.id!==g.id); state.activeId=state.games[0].id; save(); onGameSwitched(); toast("ゲームを削除"); }); });
+document.getElementById("saveDefault").addEventListener("click",()=>{ confirmDialog("今のルール（配給・返し・ウマ・ビンタ・チップ・ソシー等）を規定値として保存します。以後の新しいゲーム・新しい日はこの設定で始まります。よろしいですか？",()=>{ state.defaultRule=JSON.parse(JSON.stringify(rule())); DEFRULE=state.defaultRule; save(); toast("規定値に保存しました"); }); });
+document.getElementById("restoreDefaults").addEventListener("click",()=>{ confirmDialog("このゲームのルールを規定値に戻します。記録は保持します。",()=>{ game().rule=DEFAULT_RULE(); save(); recomputeInput(); renderSettings(); updateRuleSummary(); toast("規定値に戻しました"); }); });
+function updateRuleSummary(){ document.getElementById("ruleSummary").textContent=`${game().label}：${ruleText(rule())}`; }
+
+/* ---------- タブ/テーマ ---------- */
+let currentTab="input";
+function switchTab(t){ currentTab=t;
+  document.querySelectorAll("nav button").forEach(x=>x.classList.toggle("on",x.dataset.tab===t));
+  document.querySelectorAll(".panel").forEach(p=>p.classList.remove("active"));
+  document.getElementById("panel-"+t).classList.add("active");
+  document.getElementById("gameBar").style.display=(t==="total")?"none":"flex";
+  renderActiveTab(); window.scrollTo({top:0});
+}
+function renderActiveTab(){ if(currentTab==="input") recomputeInput(); else if(currentTab==="records") renderRecords(); else if(currentTab==="settle") renderSettle(); else if(currentTab==="total") renderTotal(); else if(currentTab==="settings") renderSettings(); }
+document.querySelectorAll("nav button").forEach(b=>b.addEventListener("click",()=>switchTab(b.dataset.tab)));
+const themeBtn=document.getElementById("themeBtn");
+themeBtn.addEventListener("click",()=>{ const cur=document.documentElement.getAttribute("data-theme"); const next=cur==="dark"?"light":cur==="light"?"":"dark"; if(next) document.documentElement.setAttribute("data-theme",next); else document.documentElement.removeAttribute("data-theme"); localStorage.setItem(LS_KEY+"-theme",next||""); });
+(function initTheme(){ const t=localStorage.getItem(LS_KEY+"-theme"); if(t) document.documentElement.setAttribute("data-theme",t); })();
+let toastT; function toast(msg){ const el=document.getElementById("toast"); el.textContent=msg; el.classList.add("show"); clearTimeout(toastT); toastT=setTimeout(()=>el.classList.remove("show"),1600); }
+let modalCb=null;
+function confirmDialog(msg,onYes){ modalCb=onYes; document.getElementById("modalMsg").textContent=msg; document.getElementById("modal").classList.add("show"); }
+document.getElementById("modalYes").addEventListener("click",()=>{ document.getElementById("modal").classList.remove("show"); const cb=modalCb; modalCb=null; if(cb) cb(); });
+document.getElementById("modalNo").addEventListener("click",()=>{ document.getElementById("modal").classList.remove("show"); modalCb=null; });
+document.getElementById("modal").addEventListener("click",e=>{ if(e.target.id==="modal"){ document.getElementById("modal").classList.remove("show"); modalCb=null; } });
+
+/* ---------- init ---------- */
+renderGameBar(); buildInputRows(); recomputeInput(); updateRuleSummary();
+if("serviceWorker" in navigator && location.protocol.startsWith("http")){ navigator.serviceWorker.register("sw.js").catch(()=>{}); }
+</script>
+</body>
+</html>
