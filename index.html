@@ -288,7 +288,7 @@ function DEFAULT_RULE(){ return DEFRULE?JSON.parse(JSON.stringify(DEFRULE)):HARD
 let state=load();
 if(state.defaultRule) DEFRULE=state.defaultRule;
 
-function freshGame(label,rule,P,seq){ return {id:seq,label:label,rule:rule||DEFAULT_RULE(),records:[],chips:{final:Array(P).fill(""),borrow:Array(P).fill("")},current:Array(P).fill(""),curYak:Array(P).fill(false)}; }
+function freshGame(label,rule,P,seq){ return {id:seq,label:label,rule:rule||DEFAULT_RULE(),records:[],chips:{final:Array(P).fill(""),lend:Array(P).fill(""),borrow:Array(P).fill("")},current:Array(P).fill(""),curYak:Array(P).fill(false)}; }
 function load(){
   try{ const s=JSON.parse(localStorage.getItem(LS_KEY)); if(s&&s.games) return normalize(s); }catch(e){}
   try{ const v2=JSON.parse(localStorage.getItem("mahjong-seisan-v2")); if(v2&&v2.games) return normalize(migrateV2(v2)); }catch(e){}
@@ -306,7 +306,7 @@ function migrateV1(o){
   const gen=o.config.genten||35000;
   const rule={start:gen,ret:gen,uma:(o.config.uma||[30000,-10000,-20000,0]).slice(0,4),bintaUnit:o.config.bintaUnit||0,yakitoriUnit:0,initChip:o.config.initChip||2000,pointPerChip:o.config.pointPerChip||1000,rate:o.config.rate||10};
   const g=freshGame("ゲーム1",rule,P,1); g.records=o.records||[];
-  if(o.chips){ g.chips.final=(o.chips.final||g.chips.final).slice(0,P); g.chips.borrow=(o.chips.borrow||g.chips.borrow).slice(0,P); }
+  if(o.chips){ g.chips.final=(o.chips.final||g.chips.final).slice(0,P); g.chips.lend=(o.chips.lend||g.chips.lend).slice(0,P); g.chips.borrow=(o.chips.borrow||g.chips.borrow).slice(0,P); }
   g.current=(o.current||g.current).slice(0,P);
   return {players:P,names:names,seq:2,games:[g],activeId:1};
 }
@@ -322,7 +322,7 @@ function normalize(s){
     g.rule=Object.assign(DEFAULT_RULE(),g.rule||{});
     g.rule.uma=(g.rule.uma||[]).slice(0,4); while(g.rule.uma.length<4) g.rule.uma.push(0);
     g.records=(g.records||[]).map(r=>Array.isArray(r)?{s:fixLen(r,P,""),y:Array(P).fill(false)}:{s:fixLen(r.s,P,""),y:fixLen(r.y,P,false)});
-    g.chips=g.chips||{}; g.chips.final=fixLen(g.chips.final,P,""); g.chips.borrow=fixLen(g.chips.borrow,P,"");
+    g.chips=g.chips||{}; g.chips.final=fixLen(g.chips.final,P,""); g.chips.lend=fixLen(g.chips.lend,P,""); g.chips.borrow=fixLen(g.chips.borrow,P,"");
     g.current=fixLen(g.current,P,""); g.curYak=fixLen(g.curYak||g.yakitori,P,false); delete g.yakitori;
   });
   if(!s.games.some(g=>g.id===s.activeId)) s.activeId=s.games[0].id;
@@ -367,8 +367,8 @@ function gameTotalsPts(g){
 }
 function gameSettle(g){
   const r=g.rule; const tot=gameTotalsPts(g); const totK=tot.map(v=>v/1000);
-  const finals=g.chips.final.map(num), borrows=g.chips.borrow.map(v=>num(v)||0);
-  const chipDiff=finals.map((f,i)=> f==null?null : f-r.initChip-borrows[i]);
+  const finals=g.chips.final.map(num), lends=g.chips.lend.map(v=>num(v)||0), borrows=g.chips.borrow.map(v=>num(v)||0);
+  const chipDiff=finals.map((f,i)=> f==null?null : f-r.initChip+lends[i]-borrows[i]);
   const inclK=totK.map((t,i)=> t+(chipDiff[i]||0)*r.pointPerChip/1000);
   const sochi=inclK.map(v=>v*r.rate);
   return {tot,totK,chipDiff,inclK,sochi};
@@ -506,6 +506,7 @@ function renderSettle(){
   let body=`<tbody>`;
   body+=`<tr><td class="name">総得点<small class="rule">千点</small></td>`; for(let i=0;i<P();i++) body+=`<td class="total-cell" id="st-total-${i}"></td>`; body+=`<td></td></tr>`;
   body+=`<tr><td class="name">最終チップ</td>`; for(let i=0;i<P();i++) body+=`<td><input type="number" inputmode="numeric" data-chip="final" data-i="${i}" value="${g.chips.final[i]??""}" placeholder="${fmt(r.initChip)}"></td>`; body+=`<td class="num" id="chipFinalDiff"></td></tr>`;
+  body+=`<tr><td class="name">貸チップ</td>`; for(let i=0;i<P();i++) body+=`<td><input type="number" inputmode="numeric" data-chip="lend" data-i="${i}" value="${g.chips.lend[i]??""}" placeholder="0"></td>`; body+=`<td></td></tr>`;
   body+=`<tr><td class="name">借チップ</td>`; for(let i=0;i<P();i++) body+=`<td><input type="number" inputmode="numeric" data-chip="borrow" data-i="${i}" value="${g.chips.borrow[i]??""}" placeholder="0"></td>`; body+=`<td></td></tr>`;
   body+=`<tr><td class="name">チップ差<small class="rule">枚</small></td>`; for(let i=0;i<P();i++) body+=`<td id="st-diff-${i}"></td>`; body+=`<td></td></tr>`;
   body+=`<tr><td class="name">チップ込み合計<small class="rule">千点</small></td>`; for(let i=0;i<P();i++) body+=`<td id="st-incl-${i}"></td>`; body+=`<td></td></tr>`;
@@ -520,11 +521,11 @@ function updateSettleDerived(){
   for(let i=0;i<P();i++){ setCell(`st-total-${i}`,s.totK[i],1);
     const d=document.getElementById(`st-diff-${i}`); if(d){ d.textContent=s.chipDiff[i]==null?"–":signed(s.chipDiff[i]); d.classList.remove("pos","neg"); if(s.chipDiff[i]>0)d.classList.add("pos"); else if(s.chipDiff[i]<0)d.classList.add("neg"); }
     setCell(`st-incl-${i}`,s.inclK[i],1); setCell(`st-sochi-${i}`,s.sochi[i],0); }
-  const finals=g.chips.final.map(num), borrows=g.chips.borrow.map(v=>num(v)||0);
-  let fsum=0,fcnt=0; finals.forEach((f,i)=>{ if(f!=null){ fsum+=f-r.initChip-borrows[i]; fcnt++; } });
+  const finals=g.chips.final.map(num), lends=g.chips.lend.map(v=>num(v)||0), borrows=g.chips.borrow.map(v=>num(v)||0);
+  let fsum=0,fcnt=0; finals.forEach((f,i)=>{ if(f!=null){ fsum+=f-r.initChip+lends[i]-borrows[i]; fcnt++; } });
   const fd=document.getElementById("chipFinalDiff"); if(fd) fd.innerHTML=fcnt?`<span class="${fsum===0?"pos":"neg"}">${signed(fsum)}</span>`:"";
   const balanced=s.tot.reduce((a,b)=>a+b,0)===0;
-  document.getElementById("settleNote").innerHTML=`チップ差 = 最終チップ − 初期チップ(${fmt(r.initChip)}) − 借チップ。チップ込み合計 = 総得点 + チップ差 × ${fmt(r.pointPerChip)}/1000。ソシー = チップ込み合計 × ${fmt(r.rate)}。`+(g.records.length&&!balanced?`<br><b style="color:var(--warn)">※ 総得点の合計が0になっていません。素点の合計ズレ等を確認してください。</b>`:``);
+  document.getElementById("settleNote").innerHTML=`チップ差 = 最終チップ − 初期チップ(${fmt(r.initChip)}) ＋ 貸チップ − 借チップ。チップ込み合計 = 総得点 + チップ差 × ${fmt(r.pointPerChip)}/1000。ソシー = チップ込み合計 × ${fmt(r.rate)}。`+(g.records.length&&!balanced?`<br><b style="color:var(--warn)">※ 総得点の合計が0になっていません。素点の合計ズレ等を確認してください。</b>`:``);
 }
 
 /* ---------- 合計 ---------- */

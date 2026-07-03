@@ -1,5 +1,5 @@
 /* 麻雀 精算 — オフライン用サービスワーカー（アプリシェルをキャッシュ） */
-const CACHE = "mahjong-seisan-v1";
+const CACHE = "mahjong-seisan-v2";
 const ASSETS = ["./", "./index.html", "./manifest.webmanifest", "./icon.svg"];
 
 self.addEventListener("install", (e) => {
