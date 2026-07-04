@@ -1,7 +1,7 @@
 /* 麻雀 精算 — オフライン用サービスワーカー（アプリシェルをキャッシュ）
    HTML(ナビゲーション)はネットワーク優先=常に最新を配信し、オフライン時のみキャッシュにフォールバック。
    その他アセットはキャッシュ優先。更新配信のため内容変更時は CACHE のバージョンを上げること。 */
-const CACHE = "mahjong-seisan-v3";
+const CACHE = "mahjong-seisan-v4";
 const ASSETS = ["./", "./index.html", "./manifest.webmanifest", "./icon.svg"];
 
 self.addEventListener("install", (e) => {

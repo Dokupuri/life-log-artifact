@@ -69,7 +69,12 @@ main{max-width:640px;margin:0 auto;padding:14px 14px 24px}
 .balance{display:flex;align-items:center;gap:8px;margin:0 2px 12px;font-size:13px;color:var(--ink-2);flex-wrap:wrap}
 .pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;font-weight:700;font-size:12px}
 .pill.ok{background:var(--good-bg);color:var(--good)} .pill.ng{background:var(--bad-bg);color:var(--bad)}
-.prow{display:grid;grid-template-columns:1fr 130px;gap:10px;align-items:center;padding:12px 12px;border-bottom:1px solid var(--line-2)}
+.prow{display:grid;grid-template-columns:1fr 152px;gap:10px;align-items:center;padding:12px 12px;border-bottom:1px solid var(--line-2)}
+.score-wrap{display:flex;gap:6px;align-items:stretch}
+.score-wrap input{flex:1;min-width:0}
+.sign-btn{flex:none;width:40px;border-radius:var(--r-sm);border:1px solid var(--line);background:var(--panel);color:var(--ink-2);font-weight:800;font-size:18px;line-height:1;cursor:pointer;-webkit-appearance:none}
+.sign-btn:active{filter:brightness(.95)}
+.sign-btn.on{background:var(--bad);color:#fff;border-color:transparent}
 .prow:last-child{border-bottom:0}
 .pname{font-weight:700;font-size:16px;display:flex;align-items:center;gap:8px;min-width:0}
 .pname .seat{font-size:11px;font-weight:700;color:var(--ink-3);flex:none}
@@ -426,11 +431,15 @@ function buildInputRows(){
   for(let i=0;i<P();i++){
     const row=document.createElement("div"); row.className="prow";
     row.innerHTML=`<div class="pname"><span class="seat">${SEATS[i]}</span><span>${escapeHtml(NM(i))}</span></div>`;
-    const wrap=document.createElement("div"); const inp=document.createElement("input");
+    const wrap=document.createElement("div"); wrap.className="score-wrap";
+    const sign=document.createElement("button"); sign.type="button"; sign.className="sign-btn"; sign.textContent="±"; sign.title="符号を反転（マイナス）"; sign.setAttribute("aria-label","符号を反転（マイナス）");
+    const inp=document.createElement("input");
     inp.type="number"; inp.inputMode="numeric"; inp.className="score-input"; inp.placeholder=UNIT()===1?"持ち点":"持ち点(×"+UNIT()+")";
     inp.value=(g.current[i]===""||g.current[i]==null)?"":String(num(g.current[i])/UNIT());
-    inp.addEventListener("input",()=>{ const pv=num(inp.value); g.current[i]=(pv==null)?"":String(pv*UNIT()); colorInput(inp,i); save(); recomputeInput(); });
-    inputEls.push(inp); colorInput(inp,i); wrap.appendChild(inp); row.appendChild(wrap); inputRows.appendChild(row);
+    const syncSign=()=>{ const v=num(inp.value); sign.classList.toggle("on", v!=null&&v<0); };
+    inp.addEventListener("input",()=>{ const pv=num(inp.value); g.current[i]=(pv==null)?"":String(pv*UNIT()); colorInput(inp,i); syncSign(); save(); recomputeInput(); });
+    sign.addEventListener("click",()=>{ const v=num(inp.value); if(v==null){ inp.focus(); return; } inp.value=String(-v); inp.dispatchEvent(new Event("input",{bubbles:true})); inp.focus(); });
+    inputEls.push(inp); colorInput(inp,i); syncSign(); wrap.appendChild(sign); wrap.appendChild(inp); row.appendChild(wrap); inputRows.appendChild(row);
   }
 }
 function colorInput(inp,i){ const n=num(game().current[i]); inp.classList.remove("plus","minus","auto"); if(n!=null){ if(n-rule().ret>0) inp.classList.add("plus"); else if(n-rule().ret<0) inp.classList.add("minus"); } }
